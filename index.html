@@ -331,6 +331,28 @@
     if (map[cmd]) document.getElementById(map[cmd]).classList.add('active');
   }
 
+  // Convert Google Drive share links to direct streamable URLs
+  function normalizeVideoUrl(url) {
+    const gdMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (gdMatch) return `https://drive.google.com/uc?export=download&id=${gdMatch[1]}`;
+    return url;
+  }
+
+  // Also normalize on host side before sending
+  document.getElementById('btn-create').addEventListener('click', () => {
+    setupUrl.value = normalizeVideoUrl(setupUrl.value.trim());
+  }, true);
+
+  btnChange.addEventListener('click', () => {
+    changeUrl.value = normalizeVideoUrl(changeUrl.value.trim());
+  }, true);
+
+  function goFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }
+
   // ── VIEWER ──
   document.getElementById('btn-viewer').onclick = () => show('join');
 
@@ -338,13 +360,15 @@
     const code = codeInput.value.trim();
     if (code.length !== 4) { joinErr.textContent = 'Enter the 4-digit code'; return; }
     joinErr.textContent = '';
+    goFullscreen();
     connect(() => ws.send(JSON.stringify({ type: 'join', code })));
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'error') { joinErr.textContent = msg.msg; ws.close(); return; }
       if (msg.type === 'state') {
-        if (msg.src && vid.src !== msg.src) {
-          vid.src = msg.src;
+        const resolved = normalizeVideoUrl(msg.src || '');
+        if (resolved && vid.src !== resolved) {
+          vid.src = resolved;
           vid.load();
         }
         show('video');
