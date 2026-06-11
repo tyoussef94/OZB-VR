@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="OZB VR" />
+  <link rel="manifest" href="/manifest.json" />
   <title>OZB VR</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -135,6 +139,16 @@
     #btn-stop  { background: #c0392b; color: #fff; }
     .btn.active { box-shadow: 0 0 0 3px rgba(255,255,255,0.55); }
 
+    /* host preview */
+    #host-preview {
+      width: min(320px, 80vw);
+      aspect-ratio: 16/9;
+      border-radius: 12px;
+      background: #111;
+      object-fit: contain;
+      border: 1px solid #222;
+    }
+
     /* change video row */
     #change-row {
       display: flex;
@@ -190,8 +204,12 @@
     .err-msg { font-size: clamp(12px, 2.5vw, 14px); color: #c0392b; letter-spacing: 0.06em; min-height: 18px; }
 
     /* ── VIDEO ── */
-    #screen-video { background: #000; padding: 0; }
-    #screen-video video { width: 100vw; height: 100vh; object-fit: contain; }
+    #screen-video { background: #000; padding: 0; position: fixed; top: 0; left: 0; }
+    #screen-video video {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      object-fit: contain;
+    }
   </style>
 </head>
 <body>
@@ -215,6 +233,7 @@
 <div id="screen-controller" class="screen">
   <span class="code-label">Room code</span>
   <div class="room-code" id="code-display">—</div>
+  <video id="host-preview" muted playsinline webkit-playsinline></video>
   <div id="controls">
     <button class="btn" id="btn-play">
       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -267,6 +286,7 @@
   }
 
   const vid        = document.getElementById('vid');
+  const hostPreview = document.getElementById('host-preview');
   const codeDisp   = document.getElementById('code-display');
   const hostDot    = document.getElementById('host-dot');
   const hostStat   = document.getElementById('host-status');
@@ -289,8 +309,9 @@
   document.getElementById('btn-host').onclick = () => show('setup');
 
   document.getElementById('btn-create').onclick = () => {
-    const src = setupUrl.value.trim();
+    const src = normalizeVideoUrl(setupUrl.value.trim());
     show('controller');
+    if (src) { hostPreview.src = src; hostPreview.load(); }
     connect(() => {
       ws.send(JSON.stringify({ type: 'create', src }));
       hostDot.className = 'dot on';
@@ -299,7 +320,7 @@
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'created') codeDisp.textContent = msg.code;
-      if (msg.type === 'state') syncButtons(msg.cmd);
+      if (msg.type === 'state') { syncButtons(msg.cmd); syncHostPreview(msg); }
     };
     ws.onclose = () => { hostDot.className = 'dot err'; hostStat.textContent = 'Disconnected'; };
   };
@@ -314,15 +335,27 @@
   }
 
   btnChange.onclick = () => {
-    const src = changeUrl.value.trim();
+    const src = normalizeVideoUrl(changeUrl.value.trim());
     if (!src) return;
     if (ws && ws.readyState === 1) {
       ws.send(JSON.stringify({ type: 'src', src }));
+      hostPreview.src = src;
+      hostPreview.load();
       btnChange.textContent = 'Saved!';
       btnChange.classList.add('saved');
       setTimeout(() => { btnChange.textContent = 'Update'; btnChange.classList.remove('saved'); }, 2000);
     }
   };
+
+  function syncHostPreview(msg) {
+    if (msg.src) {
+      const resolved = normalizeVideoUrl(msg.src);
+      if (hostPreview.src !== resolved) { hostPreview.src = resolved; hostPreview.load(); }
+    }
+    if (msg.cmd === 'play') hostPreview.play().catch(() => {});
+    else if (msg.cmd === 'pause') hostPreview.pause();
+    else if (msg.cmd === 'stop') { hostPreview.pause(); hostPreview.currentTime = 0; }
+  }
 
   function syncButtons(cmd) {
     ['btn-play','btn-pause','btn-stop'].forEach(id =>
@@ -331,10 +364,14 @@
     if (map[cmd]) document.getElementById(map[cmd]).classList.add('active');
   }
 
-  // Convert Google Drive share links to direct streamable URLs
+  // Normalize video URLs for direct streaming
   function normalizeVideoUrl(url) {
+    if (!url) return url;
+    // Google Drive
     const gdMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (gdMatch) return `https://drive.google.com/uc?export=download&id=${gdMatch[1]}`;
+    // Dropbox — force raw streaming
+    if (url.includes('dropbox.com')) return url.replace(/[?&]dl=\d/, '').replace(/[?&]raw=\d/, '') + (url.includes('?') ? '&' : '?') + 'raw=1';
     return url;
   }
 
@@ -384,6 +421,8 @@
   function applyState(msg) {
     if (msg.cmd === 'play') {
       vid.play().catch(() => { vid.muted = true; vid.play(); });
+      // iOS Safari fullscreen on the video element itself
+      if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();
     } else if (msg.cmd === 'pause') {
       vid.pause();
     } else if (msg.cmd === 'stop') {
