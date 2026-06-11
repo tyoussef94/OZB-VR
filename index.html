@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>OZB VR</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      color: #fff;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      width: 100vw; height: 100vh;
+      padding: 28px;
+    }
+    .screen.active { display: flex; }
+
+    h1 {
+      font-size: clamp(22px, 5vw, 36px);
+      font-weight: 300;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    /* ── HOME ── */
+    .home-btn {
+      width: min(320px, 80vw);
+      padding: 20px;
+      border-radius: 16px;
+      border: none;
+      cursor: pointer;
+      font-size: clamp(15px, 3.5vw, 20px);
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: transform 0.1s;
+    }
+    .home-btn:active { transform: scale(0.95); }
+    #btn-host   { background: #1db954; color: #fff; }
+    #btn-viewer { background: #1a1a1a; color: #fff; border: 2px solid #333; }
+
+    /* ── URL INPUT ── */
+    .url-input {
+      width: min(420px, 88vw);
+      padding: 16px 18px;
+      border-radius: 14px;
+      border: 2px solid #333;
+      background: #111;
+      color: #fff;
+      font-size: clamp(13px, 3vw, 16px);
+      outline: none;
+      caret-color: #1db954;
+    }
+    .url-input:focus { border-color: #1db954; }
+    .url-input::placeholder { color: #555; }
+
+    .primary-btn {
+      width: min(420px, 88vw);
+      padding: 18px;
+      border-radius: 14px;
+      border: none;
+      background: #1db954;
+      color: #fff;
+      font-size: clamp(15px, 3.5vw, 18px);
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .primary-btn:active { transform: scale(0.95); }
+
+    .hint {
+      font-size: clamp(11px, 2.2vw, 13px);
+      color: #555;
+      letter-spacing: 0.05em;
+      text-align: center;
+      max-width: min(420px, 88vw);
+      line-height: 1.6;
+    }
+    .hint a { color: #888; }
+
+    /* ── CONTROLLER ── */
+    .room-code {
+      font-size: clamp(64px, 18vw, 110px);
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      line-height: 1;
+    }
+    .code-label {
+      font-size: clamp(11px, 2.2vw, 14px);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      opacity: 0.4;
+    }
+
+    #controls {
+      display: flex;
+      gap: clamp(12px, 3.5vw, 28px);
+    }
+    .btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: clamp(84px, 20vw, 120px);
+      height: clamp(84px, 20vw, 120px);
+      border-radius: 18px;
+      border: none;
+      cursor: pointer;
+      font-size: clamp(10px, 2vw, 13px);
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      transition: transform 0.08s, box-shadow 0.15s;
+    }
+    .btn:active { transform: scale(0.92); }
+    .btn svg { width: clamp(26px, 6vw, 40px); height: clamp(26px, 6vw, 40px); }
+    #btn-play  { background: #1db954; color: #fff; }
+    #btn-pause { background: #1a1a1a; color: #fff; border: 2px solid #333; }
+    #btn-stop  { background: #c0392b; color: #fff; }
+    .btn.active { box-shadow: 0 0 0 3px rgba(255,255,255,0.55); }
+
+    /* change video row */
+    #change-row {
+      display: flex;
+      gap: 10px;
+      width: min(420px, 88vw);
+    }
+    #change-row .url-input { flex: 1; padding: 12px 14px; font-size: clamp(12px, 2.5vw, 14px); }
+    #btn-change {
+      padding: 12px 18px;
+      border-radius: 14px;
+      border: none;
+      background: #1a1a1a;
+      color: #fff;
+      border: 2px solid #333;
+      font-size: clamp(11px, 2.2vw, 13px);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.1s, border-color 0.2s;
+    }
+    #btn-change:active { transform: scale(0.95); }
+    #btn-change.saved  { border-color: #1db954; color: #1db954; }
+
+    .status {
+      display: flex; align-items: center; gap: 10px;
+      font-size: clamp(11px, 2.2vw, 13px);
+      letter-spacing: 0.08em;
+      opacity: 0.5;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; transition: background 0.3s; }
+    .dot.on  { background: #1db954; }
+    .dot.err { background: #c0392b; }
+
+    /* ── CODE ENTRY ── */
+    .code-input {
+      width: min(220px, 65vw);
+      padding: 18px;
+      border-radius: 14px;
+      border: 2px solid #333;
+      background: #111;
+      color: #fff;
+      font-size: clamp(32px, 9vw, 52px);
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-align: center;
+      outline: none;
+      caret-color: #1db954;
+    }
+    .code-input:focus { border-color: #1db954; }
+
+    .err-msg { font-size: clamp(12px, 2.5vw, 14px); color: #c0392b; letter-spacing: 0.06em; min-height: 18px; }
+
+    /* ── VIDEO ── */
+    #screen-video { background: #000; padding: 0; }
+    #screen-video video { width: 100vw; height: 100vh; object-fit: contain; }
+  </style>
+</head>
+<body>
+
+<!-- Home -->
+<div id="screen-home" class="screen active">
+  <h1>OZB VR</h1>
+  <button class="home-btn" id="btn-host">I'm the Host</button>
+  <button class="home-btn" id="btn-viewer">I'm a Viewer</button>
+</div>
+
+<!-- Host setup (paste video URL) -->
+<div id="screen-setup" class="screen">
+  <h1>Video URL</h1>
+  <input class="url-input" id="setup-url" type="url" placeholder="Paste a direct video link…" />
+  <button class="primary-btn" id="btn-create">Create Room</button>
+  <p class="hint">Works with any direct .mp4 link.<br/>Dropbox: swap <code>dl=0</code> → <code>raw=1</code> in the share URL.</p>
+</div>
+
+<!-- Controller -->
+<div id="screen-controller" class="screen">
+  <span class="code-label">Room code</span>
+  <div class="room-code" id="code-display">—</div>
+  <div id="controls">
+    <button class="btn" id="btn-play">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      Play
+    </button>
+    <button class="btn" id="btn-pause">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      Pause
+    </button>
+    <button class="btn" id="btn-stop">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+      Stop
+    </button>
+  </div>
+  <div id="change-row">
+    <input class="url-input" id="change-url" type="url" placeholder="Swap video URL…" />
+    <button id="btn-change">Update</button>
+  </div>
+  <div class="status">
+    <div class="dot" id="host-dot"></div>
+    <span id="host-status">Connecting…</span>
+  </div>
+</div>
+
+<!-- Viewer — code entry -->
+<div id="screen-join" class="screen">
+  <h1>Enter Code</h1>
+  <input class="code-input" id="code-input" type="tel" maxlength="4" placeholder="0000" inputmode="numeric" />
+  <div class="err-msg" id="join-err"></div>
+  <button class="primary-btn" id="join-btn">Join</button>
+</div>
+
+<!-- Viewer — video -->
+<div id="screen-video" class="screen">
+  <video id="vid" preload="auto" playsinline webkit-playsinline></video>
+</div>
+
+<script>
+  const screens = {
+    home: document.getElementById('screen-home'),
+    setup: document.getElementById('screen-setup'),
+    controller: document.getElementById('screen-controller'),
+    join: document.getElementById('screen-join'),
+    video: document.getElementById('screen-video'),
+  };
+
+  function show(name) {
+    Object.values(screens).forEach(s => s.classList.remove('active'));
+    screens[name].classList.add('active');
+  }
+
+  const vid        = document.getElementById('vid');
+  const codeDisp   = document.getElementById('code-display');
+  const hostDot    = document.getElementById('host-dot');
+  const hostStat   = document.getElementById('host-status');
+  const codeInput  = document.getElementById('code-input');
+  const joinErr    = document.getElementById('join-err');
+  const setupUrl   = document.getElementById('setup-url');
+  const changeUrl  = document.getElementById('change-url');
+  const btnChange  = document.getElementById('btn-change');
+
+  let ws;
+
+  function connect(onOpen) {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}`);
+    ws.onopen = onOpen;
+    return ws;
+  }
+
+  // ── HOST ──
+  document.getElementById('btn-host').onclick = () => show('setup');
+
+  document.getElementById('btn-create').onclick = () => {
+    const src = setupUrl.value.trim();
+    show('controller');
+    connect(() => {
+      ws.send(JSON.stringify({ type: 'create', src }));
+      hostDot.className = 'dot on';
+      hostStat.textContent = 'Live';
+    });
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'created') codeDisp.textContent = msg.code;
+      if (msg.type === 'state') syncButtons(msg.cmd);
+    };
+    ws.onclose = () => { hostDot.className = 'dot err'; hostStat.textContent = 'Disconnected'; };
+  };
+
+  document.getElementById('btn-play').onclick  = () => sendCmd('play');
+  document.getElementById('btn-pause').onclick = () => sendCmd('pause');
+  document.getElementById('btn-stop').onclick  = () => sendCmd('stop');
+
+  function sendCmd(cmd) {
+    if (ws && ws.readyState === 1)
+      ws.send(JSON.stringify({ type: 'cmd', cmd, time: vid.currentTime || 0 }));
+  }
+
+  btnChange.onclick = () => {
+    const src = changeUrl.value.trim();
+    if (!src) return;
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: 'src', src }));
+      btnChange.textContent = 'Saved!';
+      btnChange.classList.add('saved');
+      setTimeout(() => { btnChange.textContent = 'Update'; btnChange.classList.remove('saved'); }, 2000);
+    }
+  };
+
+  function syncButtons(cmd) {
+    ['btn-play','btn-pause','btn-stop'].forEach(id =>
+      document.getElementById(id).classList.remove('active'));
+    const map = { play:'btn-play', pause:'btn-pause', stop:'btn-stop' };
+    if (map[cmd]) document.getElementById(map[cmd]).classList.add('active');
+  }
+
+  // ── VIEWER ──
+  document.getElementById('btn-viewer').onclick = () => show('join');
+
+  function doJoin() {
+    const code = codeInput.value.trim();
+    if (code.length !== 4) { joinErr.textContent = 'Enter the 4-digit code'; return; }
+    joinErr.textContent = '';
+    connect(() => ws.send(JSON.stringify({ type: 'join', code })));
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'error') { joinErr.textContent = msg.msg; ws.close(); return; }
+      if (msg.type === 'state') {
+        if (msg.src && vid.src !== msg.src) {
+          vid.src = msg.src;
+          vid.load();
+        }
+        show('video');
+        applyState(msg);
+      }
+    };
+  }
+
+  document.getElementById('join-btn').onclick = doJoin;
+  codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
+  codeInput.addEventListener('input', () => { if (codeInput.value.length === 4) doJoin(); });
+
+  function applyState(msg) {
+    if (msg.cmd === 'play') {
+      vid.play().catch(() => { vid.muted = true; vid.play(); });
+    } else if (msg.cmd === 'pause') {
+      vid.pause();
+    } else if (msg.cmd === 'stop') {
+      vid.pause(); vid.currentTime = 0;
+    }
+  }
+</script>
+</body>
+</html>
