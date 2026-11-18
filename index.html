@@ -398,13 +398,17 @@
     if (code.length !== 4) { joinErr.textContent = 'Enter the 4-digit code'; return; }
     joinErr.textContent = '';
     goFullscreen();
+    // Pre-authorize playback while we still have the user gesture
+    vid.muted = true;
+    vid.play().then(() => { vid.pause(); vid.currentTime = 0; }).catch(() => {});
     connect(() => ws.send(JSON.stringify({ type: 'join', code })));
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'error') { joinErr.textContent = msg.msg; ws.close(); return; }
       if (msg.type === 'state') {
         const resolved = normalizeVideoUrl(msg.src || '');
-        if (resolved && vid.src !== resolved) {
+        if (resolved && vid.getAttribute('data-src') !== resolved) {
+          vid.setAttribute('data-src', resolved);
           vid.src = resolved;
           vid.load();
         }
@@ -420,6 +424,7 @@
 
   function applyState(msg) {
     if (msg.cmd === 'play') {
+      vid.muted = false;
       vid.play().catch(() => { vid.muted = true; vid.play(); });
       // iOS Safari fullscreen on the video element itself
       if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();
